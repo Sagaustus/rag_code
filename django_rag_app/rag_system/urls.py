@@ -18,6 +18,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
+from rag_core.views import ChatView
+from rag_chat.views import LoggedChatView
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Simple stateless chat (no DB logging):
+    path("api/chat/", ChatView.as_view(), name="api_chat"),
+    # Logged, conversation-aware chat endpoint:
+    path("api/chat/session/", LoggedChatView.as_view(), name="api_chat_session"),
 ]

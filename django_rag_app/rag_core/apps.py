@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class PromptEngineeringConfig(AppConfig):
+class RagCoreConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "prompt_engineering"
+    name = "rag_core"

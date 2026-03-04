@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class KnowledgeBaseConfig(AppConfig):
+class RagChatConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "knowledge_base"
+    name = "rag_chat"
