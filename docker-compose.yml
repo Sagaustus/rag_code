@@ -9,6 +9,25 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn rag_system.wsgi:application --bind 0.0.0.0:8000 --log-file -"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://rag:rag@db:5432/rag
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:

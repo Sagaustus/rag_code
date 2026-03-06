@@ -1,2 +1,2 @@
-release: /usr/bin/python3 manage.py migrate --noinput
-web: gunicorn rag_system.wsgi:application --bind 0.0.0.0:$PORT --log-file -
+release: python manage.py migrate --noinput
+web: gunicorn rag_system.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --log-file -

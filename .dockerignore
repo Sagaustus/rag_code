@@ -1,0 +1,24 @@
+.git
+.venv
+venv
+env
+ENV
+__pycache__
+*.py[cod]
+*.so
+.env
+*.env
+.env.*
+staticfiles
+db.sqlite3
+db.sqlite3-journal
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.ipynb_checkpoints
+
+# Dev-only scripts and notebooks — not needed in the Docker image
+src/
