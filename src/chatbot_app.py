@@ -3,6 +3,7 @@ Standalone Conversational Chatbot Application
 Built on IONOS RAG System with Chat History
 """
 
+import html
 import streamlit as st
 import requests
 import base64
@@ -13,7 +14,7 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 IONOS_API_TOKEN = os.getenv('IONOS_API_TOKEN')
-COLLECTION_ID = "43327e2b-e7c6-42d3-a7b4-4a0f07f7a8b3"
+COLLECTION_ID = os.getenv('IONOS_COLLECTION_ID', '')
 
 # API Configuration
 ionos_header = {
@@ -204,25 +205,27 @@ Guidelines:
 
 def display_message(message):
     """Display a chat message"""
+    content = html.escape(message['content'])
+    timestamp = html.escape(message['timestamp'])
     if message["role"] == "user":
         st.markdown(f"""
         <div class="user-message">
-            {message['content']}
-            <div class="timestamp">{message['timestamp']}</div>
+            {content}
+            <div class="timestamp">{timestamp}</div>
         </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown(f"""
         <div class="assistant-message">
-            {message['content']}
-            <div class="timestamp">{message['timestamp']}</div>
+            {content}
+            <div class="timestamp">{timestamp}</div>
         </div>
         """, unsafe_allow_html=True)
 
         # Show sources if available
         if message.get("sources"):
             sources_html = "".join([
-                f'<span class="source-badge" title="Score: {src["score"]:.3f}">📄 {src["name"][:30]}...</span>'
+                f'<span class="source-badge" title="Score: {html.escape(str(src["score"])):.3f}">📄 {html.escape(src["name"][:30])}...</span>'
                 for src in message["sources"][:3]
             ])
             st.markdown(f'<div style="margin-left: 1rem; margin-top: 0.5rem;">{sources_html}</div>',

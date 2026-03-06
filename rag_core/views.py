@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from django.conf import settings
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .client import RagClient, RagClientError
+from .client import RagClientError, get_default_client
 
 
 class ChatView(APIView):
-    """Simple POST /api/chat endpoint wrapping RagClient.
+    """Simple stateless POST /api/chat endpoint wrapping RagClient.
 
     Body: {"query": "...", "collection": "optional-index-or-key"}
     Response: {"answer": "...", "sources": [...], "error": null}
@@ -17,6 +18,8 @@ class ChatView(APIView):
         query = (request.data.get("query") or "").strip()
         if not query:
             return Response({"error": "Missing query"}, status=400)
+        if len(query) > settings.RAG_MAX_QUERY_LENGTH:
+            return Response({"error": f"Query exceeds {settings.RAG_MAX_QUERY_LENGTH} character limit"}, status=400)
 
         # Optional collection override. For now this is treated as a raw
         # collection/index UUID; front-ends can map human labels → IDs.
@@ -27,8 +30,11 @@ class ChatView(APIView):
         ).strip() or None
 
         try:
-            client = RagClient()
-            rag_resp = client.chat(prompt=query, index_id=collection)
+            client = get_default_client()
+            rag_resp = client.chat(
+                messages=[{"role": "user", "content": query}],
+                index_id=collection,
+            )
             return Response(
                 {
                     "answer": rag_resp.text,

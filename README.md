@@ -20,14 +20,17 @@ This separates RAG concerns from the game repo and makes it easier to build mult
 
 ```text
 rag_code/
-├── django_rag_app/           # BridgeQuest RAG Django service
-│   ├── manage.py
-│   ├── rag_system/           # Django project (settings, URLs)
-│   │   ├── settings.py       # INSTALLED_APPS includes rest_framework, rag_core
-│   │   └── urls.py           # /admin/, /api/chat/
-│   └── rag_core/             # Core RAG app (IONOS client + API view)
-│       ├── client.py         # RagClient wrapper around IONOS OpenAI-compatible API
-│       └── views.py          # ChatView → POST /api/chat/
+├── manage.py                 # Django entrypoint
+├── rag_system/               # Django project (settings, URLs)
+│   ├── settings.py           # INSTALLED_APPS includes rest_framework, rag_core
+│   └── urls.py               # /admin/, /api/chat/
+├── rag_core/                 # Core RAG app (IONOS client + API view)
+│   ├── client.py             # RagClient wrapper around IONOS OpenAI-compatible API
+│   └── views.py              # ChatView → POST /api/chat/
+├── rag_chat/                 # Chat persistence models (optional)
+├── rag_collections/          # Collection metadata (optional)
+├── rag_analytics/            # Analytics hooks (optional)
+├── docker-compose.yml         # Local Postgres for consistent dev/prod
 │
 ├── src/                      # Streamlit and ingestion utilities
 │   ├── chatbot_app.py        # General chat UI (streamlit)
@@ -43,7 +46,7 @@ rag_code/
 └── *.md                      # Deployment + architecture guides
 ```
 
-> Note: the older `django_rag/` scaffold has been removed; `django_rag_app/` is the canonical Django service.
+> Note: the older `django_rag/` scaffold has been removed; the Django service lives at the repo root.
 
 ---
 
@@ -64,16 +67,30 @@ IONOS_RAG_INDEX_ID=908cb8ea-58e3-4d87-a41b-05fa91a818d8   # canadian-immigration
 Install deps once:
 
 ```bash
+python3 -m venv .venv
+. .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3.2 Django RAG service (`django_rag_app/`)
+### 3.2 Django RAG service
+
+Start Postgres (local dev, recommended so dev/prod match):
 
 ```bash
-cd django_rag_app
+docker compose up -d
+```
+
+```bash
 python manage.py migrate
 python manage.py runserver 0.0.0.0:9000
 ```
+
+- Chat UI: `http://localhost:9000/chat/`
+- API: `POST http://localhost:9000/api/chat/` (stateless)
+- API (logged sessions): `POST http://localhost:9000/api/chat/session/`
+
+Note: all `/api/*` endpoints require an API key (set `RAG_API_KEY`) via `Authorization: Bearer <key>`.
+The browser UI at `/chat/` uses server-side `/chat/*` proxies so no API key is exposed to the browser.
 
 - API: `POST http://localhost:9000/api/chat/` with JSON body `{ "query": "your question" }`.
 - Response: `{ "answer": "...", "error": null }` (or an `error` string on failure).
@@ -115,7 +132,7 @@ As of **March 2026** we have:
 - ✅ A dedicated **`canadian-immigration`** collection in IONOS with hundreds of documents.
 - ✅ Multi‑workstation ingestion feeding that collection (via the upload scripts).
 - ✅ A working Streamlit search interface confirming relevant retrieval.
-- ✅ A new **BridgeQuest RAG Django service** (`django_rag_app`) with:
+- ✅ A new **BridgeQuest RAG Django service** (this repo) with:
   - `rag_core.RagClient` that wraps the IONOS OpenAI‑compatible chat API and uses `IONOS_RAG_INDEX_ID`.
   - `POST /api/chat/` endpoint returning plain `{answer, error}`.
 - ✅ The BridgeQuest game’s Immigration Consultant updated (in the `bd-game` repo) to talk to IONOS directly via RAG client; next step is to re‑point it to this service.
@@ -158,4 +175,4 @@ High‑level roadmap for this repo:
 - **Research / product team:** iterate on prompts and UX using the Streamlit apps first, then formalize successful patterns into the Django service and future researcher UI.
 - **Infra / MLOps:** manage IONOS credentials and collections; ensure `.env` is correct in each environment; monitor usage and costs.
 
-If you’re unsure where to start, run the Django service (`django_rag_app`) and the `rag_gui.py` Streamlit app side by side to see both the raw collection behavior and the chat API. 
+If you’re unsure where to start, run the Django service (`python manage.py runserver 0.0.0.0:9000`) and the `rag_gui.py` Streamlit app side by side to see both the raw collection behavior and the chat API.

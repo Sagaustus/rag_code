@@ -1,8 +1,12 @@
 """BridgeQuest RAG client wrapping IONOS AI Model Hub.
 
-Minimal version: provides a single `chat` helper that forwards prompts to
-an OpenAI-compatible chat completion endpoint configured via environment
-variables. Collection/index routing is handled by `IONOS_RAG_INDEX_ID`.
+Minimal version: provides a single `chat` helper that forwards a messages
+list to an OpenAI-compatible chat completion endpoint configured via
+environment variables. Collection/index routing is handled by
+`IONOS_RAG_INDEX_ID`.
+
+Use `get_default_client()` to obtain the process-level singleton instead of
+constructing `RagClient()` on every request.
 """
 from __future__ import annotations
 
@@ -92,18 +96,22 @@ class RagClient:
 
     def chat(
         self,
-        prompt: str,
+        messages: List[Dict[str, Any]],
         index_id: Optional[str] = None,
         extra_params: Optional[Dict[str, Any]] = None,
     ) -> RagResponse:
-        """Send a chat request.
+        """Send a chat request with a full messages list.
+
+        ``messages`` should be in OpenAI format: a list of
+        ``{"role": "user"|"assistant"|"system", "content": "..."}`` dicts.
+        Pass the full conversation history to enable multi-turn responses.
 
         ``index_id`` can override the default collection on a per-call basis,
         enabling multi-collection usage from a single service.
         """
         payload: Dict[str, Any] = {
             "model": self.model_id,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
         }
         effective_index = (index_id or self.index_id or "").strip()
         if effective_index:
@@ -143,3 +151,17 @@ class RagClient:
             return RagResponse(data=data)
 
         raise RagClientError(last_error or "All candidate chat endpoints failed")
+
+
+_default_client: Optional[RagClient] = None
+
+
+def get_default_client() -> RagClient:
+    """Return the process-level RagClient singleton, creating it on first call.
+
+    Raises RagClientError if required environment variables are missing.
+    """
+    global _default_client
+    if _default_client is None:
+        _default_client = RagClient()
+    return _default_client
