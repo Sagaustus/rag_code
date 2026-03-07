@@ -20,6 +20,7 @@ from django.urls import path
 from django.views.generic import RedirectView
 
 from rag_analytics.views import DailyStatsView
+from rag_collections.views import CollectionListView
 from rag_core.views import ChatView
 from rag_chat.views import (
     ChatPageView,
@@ -37,6 +38,7 @@ urlpatterns = [
     # ChatGPT-style web UI:
     path("chat/", ChatPageView.as_view(), name="chat_ui"),
     path("chat/send/", ChatProxyView.as_view(), name="chat_send"),
+    path("chat/collections/", CollectionListView.as_view(), name="chat_collections"),
     path("chat/conversations/", UIConversationsView.as_view(), name="chat_conversations"),
     path(
         "chat/session/<int:conversation_id>/messages/",

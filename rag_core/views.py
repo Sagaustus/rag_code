@@ -6,6 +6,13 @@ from rest_framework.views import APIView
 
 from .client import RagClientError, get_default_client
 
+_SYSTEM_PROMPT = (
+    "You are ImmiBot, the AI assistant powering imrag.ca — specialized in "
+    "Canadian immigration. Answer ONLY from retrieved documents. Cite specific "
+    "programs/policies. Note that rules change — recommend verifying on "
+    "canada.ca/immigration. You provide information, not legal advice."
+)
+
 
 class ChatView(APIView):
     """Simple stateless POST /api/chat endpoint wrapping RagClient.
@@ -32,7 +39,10 @@ class ChatView(APIView):
         try:
             client = get_default_client()
             rag_resp = client.chat(
-                messages=[{"role": "user", "content": query}],
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": query},
+                ],
                 index_id=collection,
             )
             return Response(

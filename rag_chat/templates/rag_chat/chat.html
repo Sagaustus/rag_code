@@ -4,57 +4,144 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BridgeQuest RAG Chat</title>
+    <title>ImmiBot - Canadian Immigration AI Assistant</title>
+    <meta name="description" content="AI-powered Canadian immigration assistant with access to 800,000+ official resources. Ask about Express Entry, PNPs, work permits, study permits, and more." />
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              maple: { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      .prose { line-height: 1.65; }
+      .prose p { margin-bottom: 0.5em; }
+      .prose ul, .prose ol { margin: 0.4em 0; padding-left: 1.5em; }
+      .prose li { margin-bottom: 0.2em; }
+      .prose strong { color: #f1f5f9; }
+      .prose h3, .prose h4 { font-weight: 600; margin: 0.6em 0 0.3em; }
+      .prose code { background: rgba(239,68,68,0.12); padding: 0.15em 0.35em; border-radius: 4px; font-size: 0.9em; }
+      .prose a { color: #f87171; text-decoration: underline; }
+      .typing-dots span { animation: blink 1.4s infinite both; }
+      .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+      .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes blink { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
+      .sidebar-btn.active { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); }
+      .coll-chip { transition: all 0.15s; cursor: pointer; }
+      .coll-chip:hover { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); }
+      .coll-chip.selected { border-color: rgba(239,68,68,0.6); background: rgba(239,68,68,0.12); color: #fca5a5; }
+      .coll-bar::-webkit-scrollbar { height: 4px; }
+      .coll-bar::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+      #messages::-webkit-scrollbar { width: 6px; }
+      #messages::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    </style>
   </head>
   <body class="h-screen bg-zinc-950 text-zinc-100">
     {% csrf_token %}
     <div class="h-full flex">
       <!-- Sidebar -->
-      <aside class="w-80 border-r border-zinc-800 bg-zinc-950/60">
-        <div class="p-4">
-          <div class="flex items-center justify-between">
-            <h1 class="text-lg font-semibold">BridgeQuest RAG</h1>
-            <button id="newChatBtn" class="text-sm px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700">New</button>
+      <aside id="sidebar" class="w-72 border-r border-zinc-800 bg-zinc-950/80 flex flex-col shrink-0 max-md:absolute max-md:z-30 max-md:h-full max-md:hidden">
+        <div class="p-4 border-b border-zinc-800">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-maple-700 flex items-center justify-center text-white font-bold text-sm">IM</div>
+            <div>
+              <h1 class="text-base font-semibold leading-tight">ImmiBot</h1>
+              <p class="text-[11px] text-zinc-500">Canadian Immigration AI</p>
+            </div>
           </div>
-          <p class="text-xs text-zinc-400 mt-1">ChatGPT-style UI (Django)</p>
+          <button id="newChatBtn" class="mt-3 w-full text-sm px-3 py-2 rounded-lg border border-zinc-700 hover:border-maple-600 hover:bg-maple-600/10 transition-colors flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            New Conversation
+          </button>
         </div>
-        <div class="px-4 pb-2">
-          <div class="text-xs text-zinc-400">Recent</div>
+        <div class="px-4 pt-3 pb-1">
+          <div class="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Recent Conversations</div>
         </div>
-        <div id="threads" class="px-2 overflow-auto" style="height: calc(100vh - 120px)"></div>
+        <div id="threads" class="flex-1 px-2 overflow-auto"></div>
+        <div class="p-3 border-t border-zinc-800 text-[10px] text-zinc-600 leading-tight">
+          Powered by 800,000+ official Canadian immigration resources. Not legal advice.
+        </div>
       </aside>
 
       <!-- Main -->
-      <main class="flex-1 flex flex-col">
-        <header class="border-b border-zinc-800 p-4 flex items-center justify-between">
-          <div>
-            <div class="text-sm text-zinc-400">Conversation</div>
-            <div id="convTitle" class="text-base font-medium">New chat</div>
+      <main class="flex-1 flex flex-col min-w-0">
+        <header class="border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <button id="menuBtn" class="md:hidden p-1 rounded hover:bg-zinc-800">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <div>
+              <div id="convTitle" class="text-sm font-medium">New Conversation</div>
+              <div class="text-[11px] text-zinc-500">Ask about Express Entry, PNPs, permits, citizenship &amp; more</div>
+            </div>
           </div>
-          <div class="text-xs text-zinc-500">API: /api/chat/session/</div>
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1 text-[10px] text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Online
+            </span>
+          </div>
         </header>
 
-        <section id="messages" class="flex-1 overflow-auto p-4 space-y-4"></section>
+        <section id="messages" class="flex-1 overflow-auto px-4 py-4 space-y-5"></section>
+
+        <!-- Welcome Screen -->
+        <div id="welcome" class="flex-1 overflow-auto px-4 py-8 flex flex-col items-center justify-center">
+          <div class="w-16 h-16 rounded-2xl bg-maple-700 flex items-center justify-center text-white font-bold text-2xl mb-4">IM</div>
+          <h2 class="text-xl font-semibold mb-1">Welcome to ImmiBot</h2>
+          <p class="text-sm text-zinc-400 mb-6 text-center max-w-md">Your AI assistant for Canadian immigration. I have access to 800,000+ official resources to help answer your questions.</p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
+            <button class="starter-q text-left p-3 rounded-xl border border-zinc-800 hover:border-maple-600/50 hover:bg-maple-600/5 transition-colors">
+              <div class="text-xs text-maple-500 font-medium mb-1">Express Entry</div>
+              <div class="text-sm text-zinc-300">What are the CRS score requirements for Express Entry?</div>
+            </button>
+            <button class="starter-q text-left p-3 rounded-xl border border-zinc-800 hover:border-maple-600/50 hover:bg-maple-600/5 transition-colors">
+              <div class="text-xs text-maple-500 font-medium mb-1">Work Permits</div>
+              <div class="text-sm text-zinc-300">How do I apply for an open work permit in Canada?</div>
+            </button>
+            <button class="starter-q text-left p-3 rounded-xl border border-zinc-800 hover:border-maple-600/50 hover:bg-maple-600/5 transition-colors">
+              <div class="text-xs text-maple-500 font-medium mb-1">Study Permits</div>
+              <div class="text-sm text-zinc-300">What documents do I need for a Canadian study permit?</div>
+            </button>
+            <button class="starter-q text-left p-3 rounded-xl border border-zinc-800 hover:border-maple-600/50 hover:bg-maple-600/5 transition-colors">
+              <div class="text-xs text-maple-500 font-medium mb-1">Provincial Nominees</div>
+              <div class="text-sm text-zinc-300">Which PNP streams don't require a job offer?</div>
+            </button>
+          </div>
+
+          <div class="mt-6 text-[11px] text-zinc-600 text-center max-w-sm">
+            I provide information based on official sources. Always verify on
+            <a href="https://www.canada.ca/en/immigration-refugees-citizenship.html" target="_blank" rel="noopener" class="text-maple-500 hover:underline">canada.ca/immigration</a>.
+            This is not legal advice.
+          </div>
+        </div>
 
         <footer class="border-t border-zinc-800 p-4">
+          <div id="collectionBar" class="coll-bar flex gap-1.5 overflow-x-auto pb-2 mb-2"></div>
           <form id="chatForm" class="flex gap-2">
             <input
               id="chatInput"
-              class="flex-1 rounded bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-600"
-              placeholder="Ask anything about the collection…"
+              class="flex-1 rounded-xl bg-zinc-900 border border-zinc-800 px-4 py-2.5 outline-none focus:ring-2 focus:ring-maple-600/50 focus:border-maple-600/50 placeholder-zinc-500 transition-colors"
+              placeholder="Ask about Canadian immigration..."
               autocomplete="off"
             />
             <button
               id="sendBtn"
-              class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
+              class="px-5 py-2.5 rounded-xl bg-maple-700 hover:bg-maple-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium text-sm"
               type="submit"
             >
               Send
             </button>
           </form>
-          <div class="mt-2 text-xs text-zinc-500">
-            Tip: this UI stores a local anonymous id in your browser.
+          <div class="mt-2 flex items-center justify-between text-[11px] text-zinc-600">
+            <span>ImmiBot can make mistakes. Verify important information with IRCC.</span>
+            <span>imrag.ca</span>
           </div>
         </footer>
       </main>
@@ -63,54 +150,196 @@
     <script>
       const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
 
-      let conversationId = null;
+      marked.setOptions({ breaks: true, gfm: true });
 
+      let conversationId = null;
+      let selectedCollection = 'canadian-immigration';
+      let collectionsData = [];
+
+      const sidebarEl = document.getElementById('sidebar');
       const threadsEl = document.getElementById('threads');
       const messagesEl = document.getElementById('messages');
+      const welcomeEl = document.getElementById('welcome');
       const convTitleEl = document.getElementById('convTitle');
       const chatInputEl = document.getElementById('chatInput');
       const sendBtnEl = document.getElementById('sendBtn');
+      const collectionBarEl = document.getElementById('collectionBar');
 
       function escapeHtml(s) {
         return (s || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
       }
 
-      function renderMessage(role, content) {
+      function renderMarkdown(text) {
+        try { return marked.parse(text || ''); }
+        catch { return escapeHtml(text); }
+      }
+
+      function showMessages() {
+        welcomeEl.style.display = 'none';
+        messagesEl.style.display = 'block';
+      }
+
+      function showWelcome() {
+        welcomeEl.style.display = 'flex';
+        messagesEl.style.display = 'none';
+      }
+
+      function renderMessage(role, content, sources) {
+        showMessages();
         const isUser = role === 'user';
         const wrap = document.createElement('div');
         wrap.className = 'flex ' + (isUser ? 'justify-end' : 'justify-start');
 
+        const outer = document.createElement('div');
+        outer.className = 'max-w-[85%] ' + (isUser ? '' : 'flex gap-3');
+
+        if (!isUser) {
+          const avatar = document.createElement('div');
+          avatar.className = 'w-7 h-7 rounded-lg bg-maple-700 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5';
+          avatar.textContent = 'IM';
+          outer.appendChild(avatar);
+        }
+
         const bubble = document.createElement('div');
         bubble.className =
-          'max-w-[80%] rounded-2xl px-4 py-3 border ' +
+          'rounded-2xl px-4 py-3 ' +
           (isUser
-            ? 'bg-indigo-600/20 border-indigo-500/30'
-            : 'bg-zinc-900 border-zinc-800');
+            ? 'bg-maple-700/20 border border-maple-700/30 text-zinc-100'
+            : 'bg-zinc-900 border border-zinc-800');
 
-        bubble.innerHTML = `<div class="text-xs text-zinc-400 mb-1">${isUser ? 'You' : 'Assistant'}</div>` +
-          `<div class="whitespace-pre-wrap leading-relaxed">${escapeHtml(content)}</div>`;
+        const label = document.createElement('div');
+        label.className = 'text-[11px] font-medium mb-1.5 ' + (isUser ? 'text-maple-400' : 'text-zinc-500');
+        label.textContent = isUser ? 'You' : 'ImmiBot';
+        bubble.appendChild(label);
 
-        wrap.appendChild(bubble);
+        const body = document.createElement('div');
+        if (isUser) {
+          body.className = 'text-sm whitespace-pre-wrap leading-relaxed';
+          body.textContent = content;
+        } else {
+          body.className = 'text-sm prose leading-relaxed text-zinc-300';
+          body.innerHTML = renderMarkdown(content);
+        }
+        bubble.appendChild(body);
+
+        if (!isUser && sources && sources.length > 0) {
+          const srcWrap = document.createElement('div');
+          srcWrap.className = 'mt-3 pt-2 border-t border-zinc-800';
+          const srcLabel = document.createElement('div');
+          srcLabel.className = 'text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5';
+          srcLabel.textContent = 'Sources';
+          srcWrap.appendChild(srcLabel);
+          const srcList = document.createElement('div');
+          srcList.className = 'space-y-1';
+          sources.slice(0, 5).forEach((s, i) => {
+            const item = document.createElement('div');
+            item.className = 'text-[11px] text-zinc-500 flex items-start gap-1.5';
+            const title = s.title || s.filename || s.name || s.source || ('Source ' + (i + 1));
+            const score = s.score || s.similarity;
+            item.innerHTML = '<span class="text-maple-500 shrink-0">[' + (i+1) + ']</span> ' +
+              '<span class="truncate">' + escapeHtml(title) + '</span>' +
+              (score ? '<span class="text-zinc-600 shrink-0"> ' + (score * 100).toFixed(0) + '%</span>' : '');
+            srcList.appendChild(item);
+          });
+          srcWrap.appendChild(srcList);
+          bubble.appendChild(srcWrap);
+        }
+
+        outer.appendChild(bubble);
+        wrap.appendChild(outer);
         messagesEl.appendChild(wrap);
         messagesEl.scrollTop = messagesEl.scrollHeight;
+        return bubble;
+      }
+
+      function renderTyping() {
+        showMessages();
+        const wrap = document.createElement('div');
+        wrap.className = 'flex justify-start';
+        wrap.id = 'typing-indicator';
+        const outer = document.createElement('div');
+        outer.className = 'flex gap-3';
+        const avatar = document.createElement('div');
+        avatar.className = 'w-7 h-7 rounded-lg bg-maple-700 flex items-center justify-center text-white text-[10px] font-bold shrink-0';
+        avatar.textContent = 'IM';
+        outer.appendChild(avatar);
+        const bubble = document.createElement('div');
+        bubble.className = 'rounded-2xl px-4 py-3 bg-zinc-900 border border-zinc-800';
+        bubble.innerHTML = '<div class="typing-dots flex gap-1"><span class="w-2 h-2 bg-zinc-500 rounded-full inline-block"></span><span class="w-2 h-2 bg-zinc-500 rounded-full inline-block"></span><span class="w-2 h-2 bg-zinc-500 rounded-full inline-block"></span></div>';
+        outer.appendChild(bubble);
+        wrap.appendChild(outer);
+        messagesEl.appendChild(wrap);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function removeTyping() {
+        document.getElementById('typing-indicator')?.remove();
+      }
+
+      // Collection icons by key
+      const COLL_ICONS = {
+        'canadian-immigration': '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+        'ircc': '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>',
+        'canlii': '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>',
+        'academic': '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>',
+        'archive': '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+        'open_canada': '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M3 10h18M3 7l9-4 9 4M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/></svg>',
+      };
+
+      function formatDocCount(n) {
+        if (n >= 1000) return Math.round(n / 1000) + 'K';
+        return n.toString();
+      }
+
+      function renderCollections() {
+        collectionBarEl.innerHTML = '';
+        // Sort: 'canadian-immigration' (All Sources) first, then alphabetically
+        const sorted = [...collectionsData].sort((a, b) => {
+          if (a.key === 'canadian-immigration') return -1;
+          if (b.key === 'canadian-immigration') return 1;
+          return a.name.localeCompare(b.name);
+        });
+        for (const c of sorted) {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'coll-chip flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 text-[12px] text-zinc-400 whitespace-nowrap shrink-0' +
+            (c.key === selectedCollection ? ' selected' : '');
+          const icon = COLL_ICONS[c.key] || COLL_ICONS['canadian-immigration'];
+          chip.innerHTML = icon + ' ' + escapeHtml(c.name) +
+            '<span class="text-[10px] text-zinc-600">' + formatDocCount(c.doc_count_snapshot) + '</span>';
+          chip.title = c.description || c.name;
+          chip.onclick = () => {
+            selectedCollection = c.key;
+            renderCollections();
+          };
+          collectionBarEl.appendChild(chip);
+        }
+      }
+
+      async function loadCollections() {
+        try {
+          const res = await fetch('/chat/collections/');
+          const data = await res.json();
+          collectionsData = data.collections || [];
+          renderCollections();
+        } catch { /* silently fail — default collection still works */ }
       }
 
       async function loadThreads() {
         const res = await fetch('/chat/conversations/');
         const data = await res.json();
         threadsEl.innerHTML = '';
-
         const conversations = data.conversations || [];
         if (!conversations.length) {
-          threadsEl.innerHTML = '<div class="px-3 py-2 text-sm text-zinc-500">No conversations yet.</div>';
+          threadsEl.innerHTML = '<div class="px-3 py-4 text-xs text-zinc-600 text-center">No conversations yet.<br/>Ask your first question!</div>';
           return;
         }
-
         for (const c of conversations) {
           const btn = document.createElement('button');
-          btn.className = 'w-full text-left px-3 py-2 rounded hover:bg-zinc-900 border border-transparent hover:border-zinc-800';
-          btn.innerHTML = `<div class="text-sm truncate">${escapeHtml(c.title || 'Conversation')}</div>` +
-                          `<div class="text-xs text-zinc-500">#${c.id}</div>`;
+          btn.className = 'sidebar-btn w-full text-left px-3 py-2 rounded-lg hover:bg-zinc-900 border border-transparent transition-colors mb-0.5' +
+            (c.id === conversationId ? ' active' : '');
+          btn.innerHTML = '<div class="text-sm truncate text-zinc-300">' + escapeHtml(c.title || 'Conversation') + '</div>' +
+                          '<div class="text-[10px] text-zinc-600 mt-0.5">#' + c.id + '</div>';
           btn.onclick = () => openConversation(c.id, c.title);
           threadsEl.appendChild(btn);
         }
@@ -118,31 +347,45 @@
 
       async function openConversation(id, title) {
         conversationId = id;
-        convTitleEl.textContent = title || `Conversation ${id}`;
+        convTitleEl.textContent = title || 'Conversation ' + id;
         messagesEl.innerHTML = '';
-
-        const res = await fetch(`/chat/session/${id}/messages/`);
+        showMessages();
+        const res = await fetch('/chat/session/' + id + '/messages/');
         if (!res.ok) {
           renderMessage('assistant', 'Could not load conversation.');
           return;
         }
         const data = await res.json();
-        const msgs = data.messages || [];
-        for (const m of msgs) {
-          renderMessage(m.role, m.content);
+        for (const m of (data.messages || [])) {
+          renderMessage(m.role, m.content, m.sources);
         }
+        await loadThreads();
       }
 
       function newChat() {
         conversationId = null;
-        convTitleEl.textContent = 'New chat';
+        convTitleEl.textContent = 'New Conversation';
         messagesEl.innerHTML = '';
+        showWelcome();
         chatInputEl.focus();
+        loadThreads();
       }
 
       document.getElementById('newChatBtn').addEventListener('click', (e) => {
         e.preventDefault();
         newChat();
+      });
+
+      document.getElementById('menuBtn').addEventListener('click', () => {
+        sidebarEl.classList.toggle('max-md:hidden');
+      });
+
+      document.querySelectorAll('.starter-q').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const q = btn.querySelector('.text-zinc-300').textContent;
+          chatInputEl.value = q;
+          document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+        });
       });
 
       document.getElementById('chatForm').addEventListener('submit', async (e) => {
@@ -152,8 +395,10 @@
 
         chatInputEl.value = '';
         renderMessage('user', query);
+        renderTyping();
 
         sendBtnEl.disabled = true;
+        chatInputEl.disabled = true;
         try {
           const res = await fetch('/chat/send/', {
             method: 'POST',
@@ -165,27 +410,38 @@
             body: JSON.stringify({
               query,
               conversation_id: conversationId,
+              collection_key: selectedCollection,
             }),
           });
+          removeTyping();
           const data = await res.json();
           if (!res.ok || data.error) {
-            renderMessage('assistant', data.error || 'Request failed.');
+            renderMessage('assistant', data.error || 'Something went wrong. Please try again.');
             return;
           }
-
           conversationId = data.conversation_id;
-          renderMessage('assistant', data.answer || '');
+          renderMessage('assistant', data.answer || '', data.sources || []);
           await loadThreads();
         } catch (err) {
-          renderMessage('assistant', 'Network error.');
+          removeTyping();
+          renderMessage('assistant', 'Network error. Please check your connection and try again.');
         } finally {
           sendBtnEl.disabled = false;
+          chatInputEl.disabled = false;
+          chatInputEl.focus();
+        }
+      });
+
+      chatInputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          document.getElementById('chatForm').dispatchEvent(new Event('submit'));
         }
       });
 
       // Boot
+      loadCollections();
       newChat();
-      loadThreads();
     </script>
   </body>
 </html>

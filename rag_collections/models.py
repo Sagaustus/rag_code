@@ -12,7 +12,7 @@ class CollectionMetadata(models.Model):
 
     key = models.SlugField(max_length=64, unique=True, help_text="Stable key used by UIs, e.g. 'canadian-immigration'.")
     name = models.CharField(max_length=200, help_text="Human-readable name for this collection.")
-    ionos_collection_id = models.CharField(max_length=128, unique=True, help_text="IONOS collection/ index UUID.")
+    ionos_collection_id = models.CharField(max_length=128, db_index=True, help_text="IONOS collection/ index UUID.")
 
     description = models.TextField(blank=True)
     tags = models.JSONField(blank=True, null=True, help_text="Optional list/dict of topical tags.")

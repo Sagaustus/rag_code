@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 
 from rag_core.client import RagClientError, RagResponse
 from rag_chat.models import Conversation, Message
-from rag_chat.views import _build_chat_messages, _resolve_collection
+from rag_chat.views import _build_chat_messages, _resolve_collection, _SYSTEM_PROMPT
 from rag_collections.models import CollectionMetadata
 
 _VALID_KEY = "test-api-key"
@@ -35,25 +35,31 @@ class BuildChatMessagesTest(TestCase):
     def setUp(self):
         self.conv = Conversation.objects.create(title="test")
 
-    def test_empty_history_returns_single_user_message(self):
+    def test_empty_history_returns_system_plus_user_message(self):
         msgs = _build_chat_messages(self.conv, "hello")
-        self.assertEqual(msgs, [{"role": "user", "content": "hello"}])
+        self.assertEqual(len(msgs), 2)
+        self.assertEqual(msgs[0], {"role": "system", "content": _SYSTEM_PROMPT})
+        self.assertEqual(msgs[1], {"role": "user", "content": "hello"})
 
     def test_prior_user_and_assistant_messages_included(self):
         Message.objects.create(conversation=self.conv, role=Message.ROLE_USER, content="q1")
         Message.objects.create(conversation=self.conv, role=Message.ROLE_ASSISTANT, content="a1")
         msgs = _build_chat_messages(self.conv, "q2")
-        self.assertEqual(len(msgs), 3)
-        self.assertEqual(msgs[0], {"role": "user", "content": "q1"})
-        self.assertEqual(msgs[1], {"role": "assistant", "content": "a1"})
-        self.assertEqual(msgs[2], {"role": "user", "content": "q2"})
+        # system + 2 history + current = 4
+        self.assertEqual(len(msgs), 4)
+        self.assertEqual(msgs[0]["role"], "system")
+        self.assertEqual(msgs[1], {"role": "user", "content": "q1"})
+        self.assertEqual(msgs[2], {"role": "assistant", "content": "a1"})
+        self.assertEqual(msgs[3], {"role": "user", "content": "q2"})
 
-    def test_system_messages_excluded_from_history(self):
+    def test_db_system_messages_excluded_from_history(self):
         Message.objects.create(conversation=self.conv, role=Message.ROLE_SYSTEM, content="err")
         Message.objects.create(conversation=self.conv, role=Message.ROLE_USER, content="q1")
         msgs = _build_chat_messages(self.conv, "q2")
+        # Only the injected system prompt should be present, not DB system messages
         roles = [m["role"] for m in msgs]
-        self.assertNotIn("system", roles)
+        self.assertEqual(roles.count("system"), 1)
+        self.assertEqual(msgs[0]["content"], _SYSTEM_PROMPT)
 
     def test_history_capped_at_limit(self):
         from rag_chat import views as cv
@@ -63,8 +69,9 @@ class BuildChatMessagesTest(TestCase):
                 conversation=self.conv, role=Message.ROLE_USER, content=f"q{i}"
             )
         msgs = _build_chat_messages(self.conv, "current")
-        # Cap + current query
-        self.assertEqual(len(msgs), cv._HISTORY_LIMIT + 1)
+        # system + cap + current query
+        self.assertEqual(len(msgs), cv._HISTORY_LIMIT + 2)
+        self.assertEqual(msgs[0]["role"], "system")
         self.assertEqual(msgs[-1], {"role": "user", "content": "current"})
 
 
@@ -167,9 +174,10 @@ class ChatProxyViewTest(TestCase):
         with patch("rag_chat.views.get_default_client", return_value=mock):
             self._post({"query": "second q", "conversation_id": conv.id})
         messages_sent = mock.chat.call_args.kwargs.get("messages") or mock.chat.call_args.args[0]
-        # history (2) + current (1) = 3
-        self.assertEqual(len(messages_sent), 3)
-        self.assertEqual(messages_sent[0]["content"], "first q")
+        # system (1) + history (2) + current (1) = 4
+        self.assertEqual(len(messages_sent), 4)
+        self.assertEqual(messages_sent[0]["role"], "system")
+        self.assertEqual(messages_sent[1]["content"], "first q")
 
     def test_backend_error_returns_502_and_saves_system_message(self):
         with patch("rag_chat.views.get_default_client") as mf:

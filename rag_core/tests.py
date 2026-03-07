@@ -190,13 +190,16 @@ class ChatViewTest(TestCase):
         self.assertEqual(resp.json()["answer"], "The answer is 42")
         self.assertIsNone(resp.json()["error"])
 
-    def test_chat_passes_messages_list_to_client(self):
+    def test_chat_passes_system_prompt_and_user_message(self):
         mock = _mock_rag_client()
         with patch("rag_core.views.get_default_client", return_value=mock):
             self.client.post(self.url, {"query": "hello"}, format="json", **self.auth)
         call_kwargs = mock.chat.call_args
         messages = call_kwargs.kwargs.get("messages") or call_kwargs.args[0]
-        self.assertEqual(messages, [{"role": "user", "content": "hello"}])
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertIn("ImmiBot", messages[0]["content"])
+        self.assertEqual(messages[1], {"role": "user", "content": "hello"})
 
     def test_backend_error_returns_502(self):
         with patch("rag_core.views.get_default_client") as mf:
